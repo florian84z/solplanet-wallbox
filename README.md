@@ -1,54 +1,44 @@
 # Solplanet Wallbox for Home Assistant
 
-Custom integration for the Solplanet / AISWEI EV Wallbox via the AISWEI App Cloud API.
+Custom integration for the Solplanet / AISWEI EV Wallbox via the Solplanet Web Cloud API.
 
-## Entities
+## Installation via HACS
 
-| Entity | Type | Description |
+1. HACS → Custom repositories → `https://github.com/florian84z/solplanet-wallbox` → Integration
+2. Installieren → HA neu starten
+3. Einstellungen → Integrationen → Hinzufügen → "Solplanet Wallbox"
+
+## Konfiguration
+
+| Feld | Beschreibung |
+|---|---|
+| Wallbox Seriennummer | Seriennummer der Wallbox (steht auf dem Gerät oder in der App) |
+| Anlagen-ID | Plant ID aus der Solplanet Cloud URL |
+| Token | Web Token aus dem Browser (siehe unten) |
+
+### Token holen
+
+1. `https://cloud.solplanet.net` im Browser öffnen (eingeloggt)
+2. F12 → Application → Local Storage → `cloud.solplanet.net`
+3. Wert `token` kopieren
+
+Der Token ist mehrere Wochen gültig und muss danach erneuert werden.
+
+## Entitäten
+
+| Entität | Typ | Beschreibung |
 |---|---|---|
-| Ladestrom | Sensor | Current charge current (A) |
-| Ladeleistung | Sensor | Charge power (W) |
-| Ladezeit Session | Sensor | Session duration (min) |
-| Energie Session | Sensor | Session energy (Wh) |
-| Spannung | Sensor | Voltage phase A (V) |
-| Max. Ladestrom | Sensor | Current max current setting (A) |
-| Fehlercode | Sensor | Fault code (0 = no fault) |
-| Ladepunkt Status | Sensor | 0=no plug, 1=plugged, 2=starting, 3=charging |
-| Lädt | Binary Sensor | Charging active |
-| Stecker verbunden | Binary Sensor | Plug connected |
-| Online | Binary Sensor | MQTT connection status |
-| Solar-Laden | Binary Sensor | Solar surplus charging active |
-| Plug and Charge | Binary Sensor | No RFID needed |
-| Gesperrt | Binary Sensor | Charging point locked |
-| Laden starten/stoppen | Switch | Start/stop charging session |
-| Max. Ladestrom setzen | Number | Set max charge current (6–32 A) |
-
-## Setup
-
-1. Install via HACS (custom repository)
-2. Restart Home Assistant
-3. Go to Settings → Integrations → Add → "Solplanet Wallbox"
-4. Enter your credentials:
-   - **Wallbox SN**: Serial number of your wallbox (e.g. ``)
-   - **Plant ID**: Your plant ID (e.g. ``)
-   - **User ID**: Your AISWEI user ID (e.g. ``)
-   - **Token**: JWT token from the AISWEI app (valid ~90 days)
-
-## Getting the Token
-
-Capture the token from the AISWEI iOS/Android app using mitmproxy:
-1. Set up mitmproxy as HTTP proxy on your phone
-2. Open the AISWEI app
-3. Copy the `token` header value from any API request
-4. The token is valid for ~90 days
-
-## Supported Devices
-
-- Solplanet SOL EVPOWER / EV Charger (tested with `EL001...` serial numbers)
-- Any AISWEI-based wallbox using the `aienergy-germany.aisweicloud.com` API
-
-## Notes
-
-- API: `aienergy-germany.aisweicloud.com` (App Cloud API)
-- Poll interval: 30 seconds
-- Write commands (start/stop/set current) use RRPC over MQTT
+| Ladestrom | Sensor | Aktueller Ladestrom (A) |
+| Energie heute | Sensor | Geladene Energie heute (kWh) |
+| Energie gesamt | Sensor | Gesamte geladene Energie (kWh) |
+| Energie diesen Monat | Sensor | Energie diesen Monat (kWh) |
+| Sitzungsdauer | Sensor | Dauer der aktuellen Ladesitzung (s) |
+| Energie Session | Sensor | Energie der aktuellen Sitzung (kWh) |
+| Max. Ladestrom | Sensor | Aktuell eingestellter Max. Strom (A) |
+| Ladepunkt Status | Sensor | 0=kein Stecker, 1=lädt |
+| Lädt | Binary Sensor | Ladevorgang aktiv |
+| Solar-Laden | Binary Sensor | Solar-Überschussladen aktiv |
+| Plug and Charge | Binary Sensor | Kein RFID erforderlich |
+| Gesperrt | Binary Sensor | Ladepunkt gesperrt |
+| Load Balancing | Binary Sensor | Load Balancing aktiv |
+| Max. Ladestrom setzen | Number | Maximalen Ladestrom einstellen (6–32 A) |

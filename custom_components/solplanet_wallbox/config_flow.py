@@ -4,12 +4,13 @@ from __future__ import annotations
 import voluptuous as vol
 from homeassistant import config_entries
 
-from .const import CONF_DEVICE_SN, CONF_PLANT_ID, CONF_TOKEN, DOMAIN
+from .const import CONF_COOKIE, CONF_DEVICE_SN, CONF_PLANT_ID, CONF_TOKEN, DOMAIN
 
 STEP_SCHEMA = vol.Schema({
-    vol.Required(CONF_DEVICE_SN, ): str,
-    vol.Required(CONF_PLANT_ID, ): str,
+    vol.Required(CONF_DEVICE_SN): str,
+    vol.Required(CONF_PLANT_ID): str,
     vol.Required(CONF_TOKEN): str,
+    vol.Required(CONF_COOKIE): str,
 })
 
 

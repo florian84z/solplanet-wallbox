@@ -3,16 +3,14 @@
     "step": {
       "user": {
         "title": "Solplanet Wallbox einrichten",
-        "description": "Token aus dem Browser: cloud.solplanet.net → F12 → Application → Local Storage → token",
+        "description": "Token und Cookie aus dem Browser. Öffne cloud.solplanet.net → F12 → Application → Local Storage → 'token' kopieren. Für Cookie: F12 → Console → document.cookie eingeben und den kompletten Wert kopieren.",
         "data": {
           "device_sn": "Seriennummer der Wallbox",
           "plant_id": "Anlagen-ID",
-          "token": "Web Token (aus Browser LocalStorage)"
+          "token": "Web Token (Local Storage 'token')",
+          "cookie": "Browser Cookie (document.cookie)"
         }
       }
-    },
-    "error": {
-      "cannot_connect": "Verbindung fehlgeschlagen – Token abgelaufen oder ungültig."
     }
   }
 }

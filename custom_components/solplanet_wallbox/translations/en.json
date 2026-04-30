@@ -3,16 +3,14 @@
     "step": {
       "user": {
         "title": "Set up Solplanet Wallbox",
-        "description": "Token from browser: cloud.solplanet.net → F12 → Application → Local Storage → token",
+        "description": "Token and cookie from the browser. Open cloud.solplanet.net → F12 → Application → Local Storage → copy 'token'. For cookie: F12 → Console → type document.cookie and copy the full value.",
         "data": {
           "device_sn": "Wallbox serial number",
           "plant_id": "Plant ID",
-          "token": "Web Token (from browser localStorage)"
+          "token": "Web Token (Local Storage 'token')",
+          "cookie": "Browser Cookie (document.cookie)"
         }
       }
-    },
-    "error": {
-      "cannot_connect": "Connection failed – token expired or invalid."
     }
   }
 }

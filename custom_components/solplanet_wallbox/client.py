@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from urllib.parse import quote
 
-from aiohttp import ClientSession, CookieJar
+from aiohttp import ClientSession
 
 from .const import CLOUD_BASE
 
@@ -43,17 +43,18 @@ class SolplanetWallboxClient:
         self,
         session: ClientSession,
         token: str,
+        cookie: str,
         device_sn: str,
         plant_id: str,
     ) -> None:
         self._session = session
         self._token = token
+        self._cookie = cookie
         self._device_sn = device_sn
         self._plant_id = plant_id
-        self._cookie = None
 
     def _headers(self) -> dict:
-        h = {
+        return {
             "Accept": "application/json",
             "Accept-Language": "de-DE,de;q=0.9",
             "Content-Type": "application/json",
@@ -74,60 +75,15 @@ class SolplanetWallboxClient:
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"Windows"',
             "token": self._token,
+            "Cookie": self._cookie,
         }
-        if self._cookie:
-            h["Cookie"] = self._cookie
-        return h
-
-    async def _fetch_cookie(self) -> None:
-        """Fetch the anti-bot session cookie by visiting the page first."""
-        try:
-            async with self._session.get(
-                f"{CLOUD_HOST}/home/device/evchargerDetail"
-                f"?deviceSn={self._device_sn}&id={self._plant_id}",
-                headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/147.0.0.0 Safari/537.36"
-                    ),
-                    "Accept": "text/html",
-                    "token": self._token,
-                },
-                allow_redirects=True,
-            ) as r:
-                cookies = r.cookies
-                cookie_parts = []
-                for name, val in cookies.items():
-                    cookie_parts.append(f"{name}={val}")
-                if cookie_parts:
-                    self._cookie = "; ".join(cookie_parts)
-                    _LOGGER.debug("Got cookie: %s", self._cookie)
-        except Exception as err:
-            _LOGGER.debug("Cookie fetch failed: %s", err)
 
     async def _get(self, path: str, params: dict | None = None) -> dict:
-        if not self._cookie:
-            await self._fetch_cookie()
-
         async with self._session.get(
             f"{CLOUD_BASE}{path}",
             headers=self._headers(),
             params=params,
         ) as r:
-            if r.status == 444:
-                # Cookie expired, refresh and retry once
-                _LOGGER.debug("444 received, refreshing cookie and retrying")
-                self._cookie = None
-                await self._fetch_cookie()
-                async with self._session.get(
-                    f"{CLOUD_BASE}{path}",
-                    headers=self._headers(),
-                    params=params,
-                ) as r2:
-                    r2.raise_for_status()
-                    data = await r2.json(content_type=None)
-                    return data.get("result", data)
             r.raise_for_status()
             data = await r.json(content_type=None)
             return data.get("result", data)
