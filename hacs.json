@@ -3,5 +3,6 @@
   "content_in_root": false,
   "homeassistant": "2024.1.0",
   "iot_class": "cloud_polling",
-  "filename": "solplanet_wallbox.zip"
+  "zip_release": false,
+  "filename": ""
 }

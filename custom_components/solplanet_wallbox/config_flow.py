@@ -7,8 +7,8 @@ from homeassistant import config_entries
 from .const import CONF_DEVICE_SN, CONF_PLANT_ID, CONF_TOKEN, DOMAIN
 
 STEP_SCHEMA = vol.Schema({
-    vol.Required(CONF_DEVICE_SN, default="EL0011112560176"): str,
-    vol.Required(CONF_PLANT_ID, default="5223743"): str,
+    vol.Required(CONF_DEVICE_SN, ): str,
+    vol.Required(CONF_PLANT_ID, ): str,
     vol.Required(CONF_TOKEN): str,
 })
 
