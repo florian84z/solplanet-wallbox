@@ -6,11 +6,13 @@ import logging
 from dataclasses import dataclass
 from urllib.parse import quote
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, CookieJar
 
 from .const import CLOUD_BASE
 
 _LOGGER = logging.getLogger(__name__)
+
+CLOUD_HOST = "https://cloud.solplanet.net"
 
 
 @dataclass
@@ -37,33 +39,95 @@ class WallboxLiveData:
 
 
 class SolplanetWallboxClient:
-    def __init__(self, session: ClientSession, token: str, device_sn: str, plant_id: str) -> None:
+    def __init__(
+        self,
+        session: ClientSession,
+        token: str,
+        device_sn: str,
+        plant_id: str,
+    ) -> None:
         self._session = session
         self._token = token
         self._device_sn = device_sn
         self._plant_id = plant_id
+        self._cookie = None
 
     def _headers(self) -> dict:
-        return {
+        h = {
             "Accept": "application/json",
             "Accept-Language": "de-DE,de;q=0.9",
             "Content-Type": "application/json",
-            "Referer": f"https://cloud.solplanet.net/home/device/evchargerDetail?deviceSn={self._device_sn}&id={self._plant_id}",
+            "Referer": (
+                f"{CLOUD_HOST}/home/device/evchargerDetail"
+                f"?deviceSn={self._device_sn}&id={self._plant_id}"
+            ),
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-origin",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/147.0.0.0 Safari/537.36"
+            ),
             "localE": "de_DE",
             "sec-ch-ua": '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"Windows"',
             "token": self._token,
         }
+        if self._cookie:
+            h["Cookie"] = self._cookie
+        return h
+
+    async def _fetch_cookie(self) -> None:
+        """Fetch the anti-bot session cookie by visiting the page first."""
+        try:
+            async with self._session.get(
+                f"{CLOUD_HOST}/home/device/evchargerDetail"
+                f"?deviceSn={self._device_sn}&id={self._plant_id}",
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/147.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": "text/html",
+                    "token": self._token,
+                },
+                allow_redirects=True,
+            ) as r:
+                cookies = r.cookies
+                cookie_parts = []
+                for name, val in cookies.items():
+                    cookie_parts.append(f"{name}={val}")
+                if cookie_parts:
+                    self._cookie = "; ".join(cookie_parts)
+                    _LOGGER.debug("Got cookie: %s", self._cookie)
+        except Exception as err:
+            _LOGGER.debug("Cookie fetch failed: %s", err)
 
     async def _get(self, path: str, params: dict | None = None) -> dict:
+        if not self._cookie:
+            await self._fetch_cookie()
+
         async with self._session.get(
-            f"{CLOUD_BASE}{path}", headers=self._headers(), params=params,
+            f"{CLOUD_BASE}{path}",
+            headers=self._headers(),
+            params=params,
         ) as r:
+            if r.status == 444:
+                # Cookie expired, refresh and retry once
+                _LOGGER.debug("444 received, refreshing cookie and retrying")
+                self._cookie = None
+                await self._fetch_cookie()
+                async with self._session.get(
+                    f"{CLOUD_BASE}{path}",
+                    headers=self._headers(),
+                    params=params,
+                ) as r2:
+                    r2.raise_for_status()
+                    data = await r2.json(content_type=None)
+                    return data.get("result", data)
             r.raise_for_status()
             data = await r.json(content_type=None)
             return data.get("result", data)
@@ -71,20 +135,28 @@ class SolplanetWallboxClient:
     async def _rrpc(self, key: str, data: dict) -> dict:
         message = json.dumps({"key": key, "data": data})
         encoded = quote(message)
-        url1 = f"{CLOUD_BASE}/charger/request-message-to-pile?devSn={self._device_sn}&message={encoded}"
+        url1 = (
+            f"{CLOUD_BASE}/charger/request-message-to-pile"
+            f"?devSn={self._device_sn}&message={encoded}"
+        )
         async with self._session.post(url1, headers=self._headers()) as r:
             r.raise_for_status()
             resp1 = await r.json(content_type=None)
         if resp1.get("code") != 200:
             raise RuntimeError(f"RRPC failed: {resp1}")
         ack = json.dumps(resp1.get("result", {}))
-        url2 = f"{CLOUD_BASE}/charger/proxy-message-by-mqtt?devSn={self._device_sn}&message={quote(ack)}"
+        url2 = (
+            f"{CLOUD_BASE}/charger/proxy-message-by-mqtt"
+            f"?devSn={self._device_sn}&message={quote(ack)}"
+        )
         async with self._session.post(url2, headers=self._headers()) as r:
             r.raise_for_status()
         return resp1
 
     async def get_live_data(self) -> WallboxLiveData:
-        r = await self._get("/charger/ChargeDetailBySn", {"devSn": self._device_sn})
+        r = await self._get(
+            "/charger/ChargeDetailBySn", {"devSn": self._device_sn}
+        )
         return WallboxLiveData(
             point_status=str(r.get("point_status", "0")),
             cur_a=r.get("cur_a"),
@@ -98,7 +170,9 @@ class SolplanetWallboxClient:
         )
 
     async def get_config(self) -> dict:
-        return await self._get("/charger/getChargerOperateInfo", {"devSn": self._device_sn})
+        return await self._get(
+            "/charger/getChargerOperateInfo", {"devSn": self._device_sn}
+        )
 
     async def set_max_current(self, ampere: int) -> dict:
         return await self._rrpc("RRPC/Config", {"name0": False, "MaxCur": ampere})
