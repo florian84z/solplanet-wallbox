@@ -29,9 +29,9 @@ Custom integration for the Solplanet / AISWEI EV Wallbox via the AISWEI App Clou
 2. Restart Home Assistant
 3. Go to Settings → Integrations → Add → "Solplanet Wallbox"
 4. Enter your credentials:
-   - **Wallbox SN**: Serial number of your wallbox (e.g. `EL0011112560176`)
-   - **Plant ID**: Your plant ID (e.g. `5223743`)
-   - **User ID**: Your AISWEI user ID (e.g. `1645824`)
+   - **Wallbox SN**: Serial number of your wallbox (e.g. `EL0011112560xxx`)
+   - **Plant ID**: Your plant ID (e.g. `5223xxx`)
+   - **User ID**: Your AISWEI user ID (e.g. `1645xxx`)
    - **Token**: JWT token from the AISWEI app (valid ~90 days)
 
 ## Getting the Token
