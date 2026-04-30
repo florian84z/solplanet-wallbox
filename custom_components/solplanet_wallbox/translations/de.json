@@ -3,17 +3,16 @@
     "step": {
       "user": {
         "title": "Solplanet Wallbox einrichten",
-        "description": "Token aus der AISWEI App (via mitmproxy) oder aus dem Browser-LocalStorage.",
+        "description": "Token aus dem Browser: cloud.solplanet.net → F12 → Application → Local Storage → token",
         "data": {
           "device_sn": "Seriennummer der Wallbox",
           "plant_id": "Anlagen-ID",
-          "user_id": "User-ID",
-          "token": "API Token (JWT)"
+          "token": "Web Token (aus Browser LocalStorage)"
         }
       }
     },
     "error": {
-      "cannot_connect": "Verbindung fehlgeschlagen – Token abgelaufen oder falsche Zugangsdaten."
+      "cannot_connect": "Verbindung fehlgeschlagen – Token abgelaufen oder ungültig."
     }
   }
 }

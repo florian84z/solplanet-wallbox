@@ -12,29 +12,26 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import SolplanetWallboxCoordinator
 
-BINARY_SENSORS: list[tuple[BinarySensorEntityDescription, str]] = [
+BINARY_SENSORS = [
     (BinarySensorEntityDescription(
         key="is_charging", name="Lädt",
         device_class=BinarySensorDeviceClass.BATTERY_CHARGING,
     ), "is_charging"),
     (BinarySensorEntityDescription(
-        key="is_connected", name="Stecker verbunden",
-        device_class=BinarySensorDeviceClass.PLUG,
-    ), "is_connected"),
-    (BinarySensorEntityDescription(
-        key="mqtt_online", name="Online",
-        device_class=BinarySensorDeviceClass.CONNECTIVITY,
-    ), "mqtt_online"),
-    (BinarySensorEntityDescription(
         key="solar_enable", name="Solar-Laden",
+        device_class=BinarySensorDeviceClass.POWER,
     ), "solar_enable"),
     (BinarySensorEntityDescription(
         key="plug_chg_enable", name="Plug and Charge",
+        device_class=BinarySensorDeviceClass.PLUG,
     ), "plug_chg_enable"),
     (BinarySensorEntityDescription(
         key="point_lock", name="Gesperrt",
         device_class=BinarySensorDeviceClass.LOCK,
     ), "point_lock"),
+    (BinarySensorEntityDescription(
+        key="load_balance", name="Load Balancing",
+    ), "load_balance"),
 ]
 
 
@@ -42,10 +39,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: SolplanetWallboxCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([
-        WallboxBinarySensor(coordinator, desc, key)
-        for desc, key in BINARY_SENSORS
-    ])
+    async_add_entities([WallboxBinarySensor(coordinator, desc, key) for desc, key in BINARY_SENSORS])
 
 
 class WallboxBinarySensor(CoordinatorEntity[SolplanetWallboxCoordinator], BinarySensorEntity):
@@ -66,6 +60,4 @@ class WallboxBinarySensor(CoordinatorEntity[SolplanetWallboxCoordinator], Binary
         if not self.coordinator.data:
             return None
         val = self.coordinator.data.get(self._data_key)
-        if val is None:
-            return None
-        return bool(val)
+        return bool(val) if val is not None else None

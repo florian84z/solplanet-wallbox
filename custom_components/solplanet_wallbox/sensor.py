@@ -5,7 +5,7 @@ from homeassistant.components.sensor import (
     SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfElectricCurrent, UnitOfEnergy, UnitOfPower, UnitOfTime
+from homeassistant.const import UnitOfElectricCurrent, UnitOfEnergy, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -13,46 +13,49 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import SolplanetWallboxCoordinator
 
-SENSORS: list[tuple[SensorEntityDescription, str]] = [
+SENSORS = [
     (SensorEntityDescription(
-        key="current_a", name="Ladestrom",
+        key="cur_a", name="Ladestrom",
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         device_class=SensorDeviceClass.CURRENT,
         state_class=SensorStateClass.MEASUREMENT,
-    ), "current_a"),
+    ), "cur_a"),
     (SensorEntityDescription(
-        key="chg_power", name="Ladeleistung",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-    ), "chg_power"),
-    (SensorEntityDescription(
-        key="chg_time", name="Ladezeit Session",
-        native_unit_of_measurement=UnitOfTime.MINUTES,
-        device_class=SensorDeviceClass.DURATION,
-        state_class=SensorStateClass.MEASUREMENT,
-    ), "chg_time"),
-    (SensorEntityDescription(
-        key="chg_epe", name="Energie Session",
-        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+        key="etoday", name="Energie heute",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
-    ), "chg_epe"),
+    ), "etoday"),
     (SensorEntityDescription(
-        key="voltage_a", name="Spannung",
-        native_unit_of_measurement="V",
-        device_class=SensorDeviceClass.VOLTAGE,
+        key="etotal", name="Energie gesamt",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ), "etotal"),
+    (SensorEntityDescription(
+        key="emonth", name="Energie diesen Monat",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ), "emonth"),
+    (SensorEntityDescription(
+        key="keep_time", name="Sitzungsdauer",
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
-    ), "voltage_a"),
+    ), "keep_time"),
+    (SensorEntityDescription(
+        key="session_energy", name="Energie Session",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ), "session_energy"),
     (SensorEntityDescription(
         key="max_cur", name="Max. Ladestrom",
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         device_class=SensorDeviceClass.CURRENT,
         state_class=SensorStateClass.MEASUREMENT,
     ), "max_cur"),
-    (SensorEntityDescription(
-        key="fault_code", name="Fehlercode",
-    ), "fault_code"),
     (SensorEntityDescription(
         key="point_status", name="Ladepunkt Status",
     ), "point_status"),
@@ -63,10 +66,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: SolplanetWallboxCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([
-        WallboxSensor(coordinator, desc, key)
-        for desc, key in SENSORS
-    ])
+    async_add_entities([WallboxSensor(coordinator, desc, key) for desc, key in SENSORS])
 
 
 class WallboxSensor(CoordinatorEntity[SolplanetWallboxCoordinator], SensorEntity):

@@ -1,7 +1,7 @@
-"""Number entities for Solplanet Wallbox (max current control)."""
+"""Number entities for Solplanet Wallbox."""
 from __future__ import annotations
 
-from homeassistant.components.number import NumberEntity, NumberEntityDescription, NumberMode
+from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfElectricCurrent
 from homeassistant.core import HomeAssistant
@@ -20,7 +20,7 @@ async def async_setup_entry(
 
 
 class WallboxMaxCurrentNumber(CoordinatorEntity[SolplanetWallboxCoordinator], NumberEntity):
-    """Set maximum charge current (6–32 A)."""
+    """Slider to set max charge current (6–32 A)."""
 
     def __init__(self, coordinator: SolplanetWallboxCoordinator) -> None:
         super().__init__(coordinator)
@@ -31,6 +31,7 @@ class WallboxMaxCurrentNumber(CoordinatorEntity[SolplanetWallboxCoordinator], Nu
         self._attr_native_step = 1
         self._attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
         self._attr_mode = NumberMode.SLIDER
+        self._attr_icon = "mdi:current-ac"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, coordinator.device_sn)},
             "name": f"Solplanet Wallbox {coordinator.device_sn}",

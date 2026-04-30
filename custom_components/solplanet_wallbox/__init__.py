@@ -7,17 +7,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import SolplanetWallboxClient
-from .const import CONF_DEVICE_SN, CONF_PLANT_ID, CONF_TOKEN, CONF_USER_ID, DOMAIN
+from .const import CONF_DEVICE_SN, CONF_PLANT_ID, CONF_TOKEN, DOMAIN
 from .coordinator import SolplanetWallboxCoordinator
 
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.NUMBER, Platform.SWITCH]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.NUMBER]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = async_get_clientsession(hass)
     client = SolplanetWallboxClient(
         session=session,
-        userid=entry.data[CONF_USER_ID],
         token=entry.data[CONF_TOKEN],
         device_sn=entry.data[CONF_DEVICE_SN],
         plant_id=entry.data[CONF_PLANT_ID],

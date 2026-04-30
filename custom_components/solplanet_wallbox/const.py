@@ -5,12 +5,10 @@ MANUFACTURER = "Solplanet / AISWEI"
 
 CONF_DEVICE_SN = "device_sn"
 CONF_PLANT_ID = "plant_id"
-CONF_USER_ID = "user_id"
 CONF_TOKEN = "token"
 
-APP_BASE = "https://aienergy-germany.aisweicloud.com"
-APP_KEY = "204118125"
-APP_VERSION = "4.11.1"
+# Web Cloud API (cloud.solplanet.net) - no HMAC needed, just token header
+CLOUD_BASE = "https://cloud.solplanet.net/api"
 
 DEFAULT_SCAN_INTERVAL = 30
 

@@ -1,191 +1,155 @@
-"""Solplanet Wallbox App API Client."""
+"""Solplanet Wallbox Web Cloud API Client.
+
+Uses cloud.solplanet.net (same-origin web API).
+Authentication: token from browser localStorage['token'].
+No HMAC signature required.
+
+Endpoints used:
+  GET /charger/ChargeDetailBySn?devSn=<SN>      -> live data
+  GET /charger/getChargerOperateInfo?devSn=<SN> -> config
+  POST /charger/request-message-to-pile         -> RRPC write
+  POST /charger/proxy-message-by-mqtt           -> RRPC ack
+"""
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
 import json
 import logging
-import time
-import uuid
 from dataclasses import dataclass
-from email.utils import formatdate
-from urllib.parse import urlencode
+from urllib.parse import quote
 
 from aiohttp import ClientSession
 
-from .const import APP_BASE, APP_KEY, APP_VERSION
+from .const import CLOUD_BASE
 
 _LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
-class WallboxRealtimeData:
-    """Realtime data from pile-realtime-info endpoint."""
-    dev_sn: str | None = None
-    mqtt_status: int | None = None
-    point_status: int | None = None
-    vol_a: float | None = None
-    cur_a: float | None = None
-    chg_power: float | None = None
-    chg_time: int | None = None
-    chg_epe: float | None = None
-    fault_code: int | None = None
-    order_no_server: str | None = None
-    start_time: str | None = None
-
-    @property
-    def current_a(self) -> float | None:
-        """Return current in Ampere (CurA is in 10mA units)."""
-        return round(self.cur_a / 100, 2) if self.cur_a is not None else None
+class WallboxLiveData:
+    """Live data from ChargeDetailBySn."""
+    point_status: str | None = None   # "0"=idle, "1"=charging
+    cur_a: float | None = None        # Ladestrom in A
+    etoday: float | None = None       # Energie heute kWh
+    etotal: float | None = None       # Energie gesamt kWh
+    emonth: float | None = None       # Energie diesen Monat kWh
+    keep_time: int | None = None      # Sitzungsdauer Sekunden
+    chg_epe: int | None = None        # Sitzungsenergie (×0.1 kWh)
+    soft_ver: str | None = None       # Firmware
+    order_id: str | None = None
 
     @property
     def is_charging(self) -> bool:
-        return self.point_status == 3
+        return str(self.point_status) == "1"
 
     @property
     def is_connected(self) -> bool:
-        return self.point_status in (1, 2, 3)
+        return str(self.point_status) in ("1",)
+
+    @property
+    def session_energy_kwh(self) -> float | None:
+        if self.chg_epe is None:
+            return None
+        return round(self.chg_epe / 10, 2)
 
 
 class SolplanetWallboxClient:
-    """Client for the Solplanet/AISWEI Wallbox App Cloud API."""
+    """Client for the Solplanet Web Cloud API."""
 
     def __init__(
         self,
         session: ClientSession,
-        userid: str,
         token: str,
         device_sn: str,
         plant_id: str,
-        app_secret: str = "",
     ) -> None:
         self._session = session
-        self._userid = userid
         self._token = token
         self._device_sn = device_sn
         self._plant_id = plant_id
-        self._app_secret = app_secret
 
-    def _make_headers(self, method: str, path: str) -> dict:
-        ts = str(int(time.time() * 1000))
-        nonce = str(uuid.uuid4()).upper()
-        date = formatdate(usegmt=True)
-        ct = "application/x-www-form-urlencoded; charset=UTF-8"
-        signed_headers = "\n".join([
-            f"X-Ca-Key:{APP_KEY}",
-            f"X-Ca-Nonce:{nonce}",
-            "X-Ca-Signature-Method:HmacSHA256",
-            f"X-Ca-Timestamp:{ts}",
-            "X-Ca-Version:1",
-        ])
-        sts = "\n".join([
-            method.upper(),
-            "application/json; charset=UTF-8",
-            "",
-            ct,
-            date,
-            signed_headers,
-            path,
-        ])
-        if self._app_secret:
-            sig = base64.b64encode(
-                hmac.new(self._app_secret.encode(), sts.encode(), hashlib.sha256).digest()
-            ).decode()
-        else:
-            sig = "NO_SECRET"
-
+    def _headers(self, referer_path: str = "") -> dict:
         return {
-            "userid": self._userid,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
             "token": self._token,
-            "factory": "aiswei",
-            "x-ca-timestamp": ts,
-            "x-ca-key": APP_KEY,
-            "region": "1",
-            "x-ca-signature-method": "HmacSHA256",
-            "locale": "de_DE",
-            "os": "iOS",
-            "versioncode": APP_VERSION,
-            "usertype": "1",
-            "date": date,
-            "x-ca-nonce": nonce,
-            "x-ca-signature": sig,
-            "x-ca-signature-headers": "X-Ca-Key,X-Ca-Nonce,X-Ca-Signature-Method,X-Ca-Timestamp,X-Ca-Version",
-            "x-ca-version": "1",
-            "Accept": "application/json; charset=UTF-8",
-            "Content-Type": ct,
+            "localE": "de_DE",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/147.0.0.0 Safari/537.36"
+            ),
+            "Referer": (
+                f"https://cloud.solplanet.net/home/device/"
+                f"evchargerDetail?deviceSn={self._device_sn}&id={self._plant_id}"
+            ),
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Dest": "empty",
         }
 
-    async def _post(self, path: str, data: dict) -> dict:
-        async with self._session.post(
-            f"{APP_BASE}{path}",
-            headers=self._make_headers("POST", path),
-            data=data,
+    async def _get(self, path: str, params: dict | None = None) -> dict:
+        async with self._session.get(
+            f"{CLOUD_BASE}{path}",
+            headers=self._headers(),
+            params=params,
         ) as r:
             r.raise_for_status()
-            return await r.json(content_type=None)
+            data = await r.json(content_type=None)
+            return data.get("result", data)
 
     async def _rrpc(self, key: str, data: dict) -> dict:
-        """Send RRPC command (2-step: send + proxy ACK)."""
-        msg = json.dumps({"key": key, "data": data})
-        r1 = await self._post("/charger/request-message-to-pile.json", {
-            "devSn": self._device_sn,
-            "message": msg,
-            "psn": "",
-            "stationId": self._plant_id,
-        })
-        if r1.get("status_code") != 200:
-            raise RuntimeError(f"RRPC failed: {r1}")
-        await self._post("/charger/proxy-message-by-mqtt.json", {
-            "devSn": self._device_sn,
-            "message": json.dumps(r1.get("data", {})),
-        })
-        return r1
+        """Send RRPC command and proxy ACK."""
+        message = json.dumps({"key": key, "data": data})
+        encoded = quote(message)
 
-    async def get_realtime(self) -> WallboxRealtimeData:
+        url1 = (
+            f"{CLOUD_BASE}/charger/request-message-to-pile"
+            f"?devSn={self._device_sn}&message={encoded}"
+        )
+        async with self._session.post(url1, headers=self._headers()) as r:
+            r.raise_for_status()
+            resp1 = await r.json(content_type=None)
+
+        if resp1.get("code") != 200:
+            raise RuntimeError(f"RRPC failed: {resp1}")
+
+        ack = json.dumps(resp1.get("result", {}))
+        url2 = (
+            f"{CLOUD_BASE}/charger/proxy-message-by-mqtt"
+            f"?devSn={self._device_sn}&message={quote(ack)}"
+        )
+        async with self._session.post(url2, headers=self._headers()) as r:
+            r.raise_for_status()
+
+        return resp1
+
+    async def get_live_data(self) -> WallboxLiveData:
         """Get live charging data."""
-        r = (await self._post(
-            "/charger/pile-realtime-info.json",
-            {"devSn": self._device_sn},
-        )).get("data", {})
-        return WallboxRealtimeData(
-            dev_sn=r.get("DevSn"),
-            mqtt_status=r.get("MQTTStatus"),
-            point_status=r.get("PointStatus"),
-            vol_a=r.get("VolA"),
-            cur_a=r.get("CurA"),
-            chg_power=r.get("ChgPower"),
-            chg_time=r.get("ChgTime"),
-            chg_epe=r.get("ChgEPE"),
-            fault_code=r.get("FaultCode"),
-            order_no_server=r.get("OrderNoServer"),
-            start_time=r.get("StartTime"),
+        r = await self._get("/charger/ChargeDetailBySn", {"devSn": self._device_sn})
+        return WallboxLiveData(
+            point_status=str(r.get("point_status", "0")),
+            cur_a=r.get("cur_a"),
+            etoday=r.get("etoday"),
+            etotal=r.get("etotal"),
+            emonth=r.get("emonth"),
+            keep_time=r.get("keep_time"),
+            chg_epe=r.get("chg_epe"),
+            soft_ver=r.get("soft_ver"),
+            order_id=r.get("order_id"),
         )
 
     async def get_config(self) -> dict:
-        """Get wallbox configuration."""
-        return (await self._post(
-            "/charger/pile-config-info.json",
-            {"devSn": self._device_sn},
-        )).get("data", {})
-
-    async def start_charging(self) -> dict:
-        return await self._rrpc("RRPC/StartChg", {
-            "OrderNoAPP": "", "OrderNoServer": "", "StartType": 5,
-            "OrderNoPoint": "", "GunNo": 1,
-        })
-
-    async def stop_charging(self) -> dict:
-        return await self._rrpc("RRPC/StopChg", {
-            "StopCode": 1, "OrderNoAPP": "", "OrderNoServer": "",
-            "OrderNoPoint": "", "GunNo": 1,
-        })
-
-    async def lock(self) -> dict:
-        return await self._rrpc("RRPC/LockPile", {"DevSn": self._device_sn})
-
-    async def unlock(self) -> dict:
-        return await self._rrpc("RRPC/UnLockPile", {"DevSn": self._device_sn})
+        """Get wallbox config."""
+        return await self._get(
+            "/charger/getChargerOperateInfo", {"devSn": self._device_sn}
+        )
 
     async def set_max_current(self, ampere: int) -> dict:
-        return await self._rrpc("RRPC/Config", {"MaxCur": ampere})
+        return await self._rrpc("RRPC/Config", {"name0": False, "MaxCur": ampere})
+
+    async def set_plug_charge(self, enable: bool) -> dict:
+        return await self._rrpc("RRPC/Config", {
+            "PlugChgEnable": 1 if enable else 0,
+            "RfidChgEnable": 0 if enable else 1,
+            "BookEnable": 0,
+        })
