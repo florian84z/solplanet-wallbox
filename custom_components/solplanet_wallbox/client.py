@@ -8,11 +8,9 @@ from urllib.parse import quote
 
 from aiohttp import ClientSession
 
-from .const import CLOUD_BASE
+from .const import CLOUD_BASE, CLOUD_HOST
 
 _LOGGER = logging.getLogger(__name__)
-
-CLOUD_HOST = "https://cloud.solplanet.net"
 
 
 @dataclass
@@ -50,12 +48,14 @@ class SolplanetWallboxClient:
         cookie: str,
         device_sn: str,
         plant_id: str,
+        auth_manager=None,
     ) -> None:
         self._session = session
         self._token = token
         self._cookie = cookie
         self._device_sn = device_sn
         self._plant_id = plant_id
+        self._auth_manager = auth_manager
 
     def _headers(self) -> dict:
         return {
@@ -82,12 +82,31 @@ class SolplanetWallboxClient:
             "Cookie": self._cookie,
         }
 
+    async def _refresh_auth(self) -> None:
+        """Refresh token and cookie via auth manager."""
+        if self._auth_manager:
+            auth = await self._auth_manager.async_get_auth(force_refresh=True)
+            self._token = auth.token
+            self._cookie = auth.cookie
+            _LOGGER.debug("Auth refreshed")
+
     async def _get(self, path: str, params: dict | None = None) -> dict:
         async with self._session.get(
             f"{CLOUD_BASE}{path}",
             headers=self._headers(),
             params=params,
         ) as r:
+            if r.status in (401, 403, 444):
+                _LOGGER.debug("Auth error %s, refreshing...", r.status)
+                await self._refresh_auth()
+                async with self._session.get(
+                    f"{CLOUD_BASE}{path}",
+                    headers=self._headers(),
+                    params=params,
+                ) as r2:
+                    r2.raise_for_status()
+                    data = await r2.json(content_type=None)
+                    return data.get("result", data)
             r.raise_for_status()
             data = await r.json(content_type=None)
             return data.get("result", data)
@@ -114,9 +133,7 @@ class SolplanetWallboxClient:
         return resp1
 
     async def get_live_data(self) -> WallboxLiveData:
-        r = await self._get(
-            "/charger/ChargeDetailBySn", {"devSn": self._device_sn}
-        )
+        r = await self._get("/charger/ChargeDetailBySn", {"devSn": self._device_sn})
         return WallboxLiveData(
             point_status=str(r.get("point_status", "0")),
             cur_a=r.get("cur_a"),

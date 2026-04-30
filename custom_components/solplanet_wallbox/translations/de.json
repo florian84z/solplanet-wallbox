@@ -3,14 +3,17 @@
     "step": {
       "user": {
         "title": "Solplanet Wallbox einrichten",
-        "description": "Token und Cookie aus dem Browser. Öffne cloud.solplanet.net → F12 → Application → Local Storage → 'token' kopieren. Für Cookie: F12 → Console → document.cookie eingeben und den kompletten Wert kopieren.",
+        "description": "Zugangsdaten für cloud.solplanet.net. Token und Cookie werden automatisch geholt und erneuert.",
         "data": {
+          "email": "E-Mail Adresse",
+          "password": "Passwort",
           "device_sn": "Seriennummer der Wallbox",
-          "plant_id": "Anlagen-ID",
-          "token": "Web Token (Local Storage 'token')",
-          "cookie": "Browser Cookie (document.cookie)"
+          "plant_id": "Anlagen-ID"
         }
       }
+    },
+    "error": {
+      "invalid_auth": "Login fehlgeschlagen – E-Mail oder Passwort falsch."
     }
   }
 }

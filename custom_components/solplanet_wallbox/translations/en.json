@@ -3,14 +3,17 @@
     "step": {
       "user": {
         "title": "Set up Solplanet Wallbox",
-        "description": "Token and cookie from the browser. Open cloud.solplanet.net → F12 → Application → Local Storage → copy 'token'. For cookie: F12 → Console → type document.cookie and copy the full value.",
+        "description": "Credentials for cloud.solplanet.net. Token and cookie will be fetched and refreshed automatically.",
         "data": {
+          "email": "Email address",
+          "password": "Password",
           "device_sn": "Wallbox serial number",
-          "plant_id": "Plant ID",
-          "token": "Web Token (Local Storage 'token')",
-          "cookie": "Browser Cookie (document.cookie)"
+          "plant_id": "Plant ID"
         }
       }
+    },
+    "error": {
+      "invalid_auth": "Login failed – incorrect email or password."
     }
   }
 }
