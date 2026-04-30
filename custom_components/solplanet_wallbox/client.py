@@ -28,6 +28,10 @@ class WallboxLiveData:
     order_id: str | None = None
 
     @property
+    def is_connected(self) -> bool:
+        return str(self.point_status) in ("1", "2", "3")
+
+    @property
     def is_charging(self) -> bool:
         return str(self.point_status) == "1"
 
