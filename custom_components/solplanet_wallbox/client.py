@@ -1,15 +1,4 @@
-"""Solplanet Wallbox Web Cloud API Client.
-
-Uses cloud.solplanet.net (same-origin web API).
-Authentication: token from browser localStorage['token'].
-No HMAC signature required.
-
-Endpoints used:
-  GET /charger/ChargeDetailBySn?devSn=<SN>      -> live data
-  GET /charger/getChargerOperateInfo?devSn=<SN> -> config
-  POST /charger/request-message-to-pile         -> RRPC write
-  POST /charger/proxy-message-by-mqtt           -> RRPC ack
-"""
+"""Solplanet Wallbox Web Cloud API Client."""
 from __future__ import annotations
 
 import json
@@ -26,24 +15,19 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class WallboxLiveData:
-    """Live data from ChargeDetailBySn."""
-    point_status: str | None = None   # "0"=idle, "1"=charging
-    cur_a: float | None = None        # Ladestrom in A
-    etoday: float | None = None       # Energie heute kWh
-    etotal: float | None = None       # Energie gesamt kWh
-    emonth: float | None = None       # Energie diesen Monat kWh
-    keep_time: int | None = None      # Sitzungsdauer Sekunden
-    chg_epe: int | None = None        # Sitzungsenergie (×0.1 kWh)
-    soft_ver: str | None = None       # Firmware
+    point_status: str | None = None
+    cur_a: float | None = None
+    etoday: float | None = None
+    etotal: float | None = None
+    emonth: float | None = None
+    keep_time: int | None = None
+    chg_epe: int | None = None
+    soft_ver: str | None = None
     order_id: str | None = None
 
     @property
     def is_charging(self) -> bool:
         return str(self.point_status) == "1"
-
-    @property
-    def is_connected(self) -> bool:
-        return str(self.point_status) in ("1",)
 
     @property
     def session_energy_kwh(self) -> float | None:
@@ -53,78 +37,53 @@ class WallboxLiveData:
 
 
 class SolplanetWallboxClient:
-    """Client for the Solplanet Web Cloud API."""
-
-    def __init__(
-        self,
-        session: ClientSession,
-        token: str,
-        device_sn: str,
-        plant_id: str,
-    ) -> None:
+    def __init__(self, session: ClientSession, token: str, device_sn: str, plant_id: str) -> None:
         self._session = session
         self._token = token
         self._device_sn = device_sn
         self._plant_id = plant_id
 
-    def _headers(self, referer_path: str = "") -> dict:
+    def _headers(self) -> dict:
         return {
             "Accept": "application/json",
+            "Accept-Language": "de-DE,de;q=0.9",
             "Content-Type": "application/json",
-            "token": self._token,
-            "localE": "de_DE",
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/147.0.0.0 Safari/537.36"
-            ),
-            "Referer": (
-                f"https://cloud.solplanet.net/home/device/"
-                f"evchargerDetail?deviceSn={self._device_sn}&id={self._plant_id}"
-            ),
-            "Sec-Fetch-Site": "same-origin",
-            "Sec-Fetch-Mode": "cors",
+            "Referer": f"https://cloud.solplanet.net/home/device/evchargerDetail?deviceSn={self._device_sn}&id={self._plant_id}",
             "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+            "localE": "de_DE",
+            "sec-ch-ua": '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
+            "token": self._token,
         }
 
     async def _get(self, path: str, params: dict | None = None) -> dict:
         async with self._session.get(
-            f"{CLOUD_BASE}{path}",
-            headers=self._headers(),
-            params=params,
+            f"{CLOUD_BASE}{path}", headers=self._headers(), params=params,
         ) as r:
             r.raise_for_status()
             data = await r.json(content_type=None)
             return data.get("result", data)
 
     async def _rrpc(self, key: str, data: dict) -> dict:
-        """Send RRPC command and proxy ACK."""
         message = json.dumps({"key": key, "data": data})
         encoded = quote(message)
-
-        url1 = (
-            f"{CLOUD_BASE}/charger/request-message-to-pile"
-            f"?devSn={self._device_sn}&message={encoded}"
-        )
+        url1 = f"{CLOUD_BASE}/charger/request-message-to-pile?devSn={self._device_sn}&message={encoded}"
         async with self._session.post(url1, headers=self._headers()) as r:
             r.raise_for_status()
             resp1 = await r.json(content_type=None)
-
         if resp1.get("code") != 200:
             raise RuntimeError(f"RRPC failed: {resp1}")
-
         ack = json.dumps(resp1.get("result", {}))
-        url2 = (
-            f"{CLOUD_BASE}/charger/proxy-message-by-mqtt"
-            f"?devSn={self._device_sn}&message={quote(ack)}"
-        )
+        url2 = f"{CLOUD_BASE}/charger/proxy-message-by-mqtt?devSn={self._device_sn}&message={quote(ack)}"
         async with self._session.post(url2, headers=self._headers()) as r:
             r.raise_for_status()
-
         return resp1
 
     async def get_live_data(self) -> WallboxLiveData:
-        """Get live charging data."""
         r = await self._get("/charger/ChargeDetailBySn", {"devSn": self._device_sn})
         return WallboxLiveData(
             point_status=str(r.get("point_status", "0")),
@@ -139,17 +98,7 @@ class SolplanetWallboxClient:
         )
 
     async def get_config(self) -> dict:
-        """Get wallbox config."""
-        return await self._get(
-            "/charger/getChargerOperateInfo", {"devSn": self._device_sn}
-        )
+        return await self._get("/charger/getChargerOperateInfo", {"devSn": self._device_sn})
 
     async def set_max_current(self, ampere: int) -> dict:
         return await self._rrpc("RRPC/Config", {"name0": False, "MaxCur": ampere})
-
-    async def set_plug_charge(self, enable: bool) -> dict:
-        return await self._rrpc("RRPC/Config", {
-            "PlugChgEnable": 1 if enable else 0,
-            "RfidChgEnable": 0 if enable else 1,
-            "BookEnable": 0,
-        })
