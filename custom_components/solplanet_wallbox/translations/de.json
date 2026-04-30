@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Solplanet Wallbox einrichten",
+        "description": "Token aus der AISWEI App (via mitmproxy) oder aus dem Browser-LocalStorage.",
+        "data": {
+          "device_sn": "Seriennummer der Wallbox",
+          "plant_id": "Anlagen-ID",
+          "user_id": "User-ID",
+          "token": "API Token (JWT)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung fehlgeschlagen – Token abgelaufen oder falsche Zugangsdaten."
+    }
+  }
+}

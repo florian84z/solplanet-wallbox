@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Solplanet Wallbox",
+        "description": "Token from the AISWEI app (via mitmproxy) or browser localStorage.",
+        "data": {
+          "device_sn": "Wallbox serial number",
+          "plant_id": "Plant ID",
+          "user_id": "User ID",
+          "token": "API Token (JWT)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Connection failed – token expired or wrong credentials."
+    }
+  }
+}
