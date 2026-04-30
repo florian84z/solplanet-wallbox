@@ -67,45 +67,20 @@ class SolplanetAuthManager:
                 msg = data.get("msg", "Unknown error")
                 raise RuntimeError(f"Login failed: {msg} (code={data.get('code')})")
 
-            result = data.get("result", data)
+            # Response structure: {"code":200,"data":{"token":"...","apitoken":"eyJ...","userId":...}}
+            result = data.get("data") or data.get("result") or data
 
-            # Extract token — different APIs put it in different places
-            token = (
-                result.get("token")
-                or result.get("access_token")
-                or data.get("token")
-                or ""
-            )
-
-            if not token:
-                # Try to get token from response headers or cookies
-                resp_cookies = r.cookies
-                for name, val in resp_cookies.items():
-                    if "token" in name.lower():
-                        token = val
-                        break
+            token = result.get("token", "")
+            apitoken = result.get("apitoken", "")
+            user_id = str(result.get("userId") or result.get("user_id") or "")
 
             if not token:
                 raise RuntimeError(
                     f"Login succeeded but no token found in response: {data}"
                 )
 
-            # Build cookie string from response cookies
-            cookie_parts = []
-            for name, val in r.cookies.items():
-                cookie_parts.append(f"{name}={val}")
-
-            # apitoken cookie is set by the web app JS, reconstruct it
-            # The JWT token IS the apitoken cookie value
-            if not any("apitoken" in p for p in cookie_parts):
-                # Try to find JWT in result
-                jwt = result.get("apitoken") or result.get("jwt") or ""
-                if jwt:
-                    cookie_parts.append(f"apitoken={jwt}")
-
-            cookie_str = "; ".join(cookie_parts) if cookie_parts else f"token={token}"
-
-            user_id = str(result.get("userId") or result.get("user_id") or "")
+            # Build cookie — apitoken is the JWT cookie needed for API calls
+            cookie_str = f"apitoken={apitoken}" if apitoken else f"token={token}"
 
             self._auth = SolplanetAuth(
                 token=token,
