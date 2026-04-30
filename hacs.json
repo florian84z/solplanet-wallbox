@@ -2,7 +2,5 @@
   "name": "Solplanet Wallbox",
   "content_in_root": false,
   "homeassistant": "2024.1.0",
-  "iot_class": "cloud_polling",
-  "zip_release": false,
-  "filename": ""
+  "iot_class": "cloud_polling"
 }
