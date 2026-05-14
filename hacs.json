@@ -1,6 +1,7 @@
 {
   "name": "Solplanet Wallbox",
-  "content_in_root": false,
-  "homeassistant": "2024.1.0",
-  "iot_class": "cloud_polling"
+  "description": "Home Assistant Integration für Solplanet EV Wallbox",
+  "render_readme": true,
+  "homeassistant": "2023.1.0",
+  "integration_type": "integration"
 }
