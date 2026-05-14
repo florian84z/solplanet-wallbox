@@ -5,7 +5,7 @@ from homeassistant.components.sensor import (
     SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfElectricCurrent, UnitOfEnergy, UnitOfTime
+from homeassistant.const import UnitOfElectricCurrent, UnitOfEnergy, UnitOfPower, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -81,7 +81,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: SolplanetWallboxCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([WallboxSensor(coordinator, desc, key) for desc, key in SENSORS])
+    entities = [WallboxSensor(coordinator, desc, key) for desc, key in SENSORS]
+    entities.append(WallboxMaxPowerSensor(coordinator))
+    async_add_entities(entities)
 
 
 class WallboxSensor(CoordinatorEntity[SolplanetWallboxCoordinator], SensorEntity):
@@ -101,3 +103,31 @@ class WallboxSensor(CoordinatorEntity[SolplanetWallboxCoordinator], SensorEntity
     @property
     def native_value(self):
         return self.coordinator.data.get(self._data_key) if self.coordinator.data else None
+
+
+class WallboxMaxPowerSensor(CoordinatorEntity[SolplanetWallboxCoordinator], SensorEntity):
+    """Max Ladeleistung in W (3-phasig: MaxCur × 230V × 3)."""
+
+    def __init__(self, coordinator: SolplanetWallboxCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.device_sn}_max_power"
+        self._attr_name = "Max. Ladeleistung"
+        self._attr_native_unit_of_measurement = UnitOfPower.WATT
+        self._attr_device_class = SensorDeviceClass.POWER
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_icon = "mdi:lightning-bolt"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, coordinator.device_sn)},
+            "name": f"Solplanet Wallbox {coordinator.device_sn}",
+            "manufacturer": MANUFACTURER,
+            "model": "EV Charger",
+        }
+
+    @property
+    def native_value(self) -> float | None:
+        if not self.coordinator.data:
+            return None
+        max_cur = self.coordinator.data.get("max_cur")
+        if max_cur is None:
+            return None
+        return round(float(max_cur) * 230 * 3)
