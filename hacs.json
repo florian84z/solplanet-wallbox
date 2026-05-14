@@ -3,5 +3,6 @@
   "description": "Home Assistant Integration für Solplanet EV Wallbox",
   "render_readme": true,
   "homeassistant": "2023.1.0",
-  "integration_type": "integration"
+  "integration_type": "integration",
+  "content_in_root": false
 }
