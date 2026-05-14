@@ -19,6 +19,7 @@ SENSORS = [
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         device_class=SensorDeviceClass.CURRENT,
         state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:current-ac",
     ), "cur_a"),
     (SensorEntityDescription(
         key="etoday", name="Energie heute",
@@ -43,7 +44,15 @@ SENSORS = [
         native_unit_of_measurement=UnitOfTime.SECONDS,
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:timer",
     ), "keep_time"),
+    (SensorEntityDescription(
+        key="session_duration", name="Sitzungsdauer Minuten",
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:timer-outline",
+    ), "session_duration"),
     (SensorEntityDescription(
         key="session_energy", name="Energie Session",
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
@@ -55,10 +64,16 @@ SENSORS = [
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         device_class=SensorDeviceClass.CURRENT,
         state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:current-ac",
     ), "max_cur"),
     (SensorEntityDescription(
         key="point_status", name="Ladepunkt Status",
+        icon="mdi:ev-station",
     ), "point_status"),
+    (SensorEntityDescription(
+        key="order_id", name="Aktuelle Order ID",
+        icon="mdi:identifier",
+    ), "order_id"),
 ]
 
 

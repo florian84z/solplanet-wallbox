@@ -24,6 +24,8 @@ class WallboxLiveData:
     chg_epe: int | None = None
     soft_ver: str | None = None
     order_id: str | None = None
+    start_timestamp: int | None = None
+    start_type: int | None = None
 
     @property
     def is_connected(self) -> bool:
@@ -38,6 +40,12 @@ class WallboxLiveData:
         if self.chg_epe is None:
             return None
         return round(self.chg_epe / 10, 2)
+
+    @property
+    def session_duration_min(self) -> int | None:
+        if self.keep_time is None:
+            return None
+        return round(self.keep_time / 60)
 
 
 class SolplanetWallboxClient:
@@ -112,8 +120,10 @@ class SolplanetWallboxClient:
             return data.get("result", data)
 
     async def _rrpc(self, key: str, data: dict) -> dict:
+        """Send RRPC command + ACK to Wallbox."""
         message = json.dumps({"key": key, "data": data})
         encoded = quote(message)
+        # Step 1: Send command
         url1 = (
             f"{CLOUD_BASE}/charger/request-message-to-pile"
             f"?devSn={self._device_sn}&message={encoded}"
@@ -123,6 +133,7 @@ class SolplanetWallboxClient:
             resp1 = await r.json(content_type=None)
         if resp1.get("code") != 200:
             raise RuntimeError(f"RRPC failed: {resp1}")
+        # Step 2: ACK via MQTT proxy (required!)
         ack = json.dumps(resp1.get("result", {}))
         url2 = (
             f"{CLOUD_BASE}/charger/proxy-message-by-mqtt"
@@ -144,6 +155,8 @@ class SolplanetWallboxClient:
             chg_epe=r.get("chg_epe"),
             soft_ver=r.get("soft_ver"),
             order_id=r.get("order_id"),
+            start_timestamp=r.get("start_timestamp"),
+            start_type=r.get("start_type"),
         )
 
     async def get_config(self) -> dict:
@@ -151,5 +164,39 @@ class SolplanetWallboxClient:
             "/charger/getChargerOperateInfo", {"devSn": self._device_sn}
         )
 
+    async def get_charge_history(self, query_type: str = "month") -> dict:
+        """Tägliche kWh Ladehistorie (month/year)."""
+        return await self._get(
+            "/charger/pileOrdersChart",
+            {
+                "queryType": query_type,
+                "devSn": self._device_sn,
+                "filter": "",
+            },
+        )
+
     async def set_max_current(self, ampere: int) -> dict:
         return await self._rrpc("RRPC/Config", {"name0": False, "MaxCur": ampere})
+
+    async def set_plug_charge(self, enabled: bool) -> dict:
+        return await self._rrpc("RRPC/Config", {
+            "BookEnable": 0,
+            "PlugChgEnable": 1 if enabled else 0,
+            "RfidChgEnable": 0,
+        })
+
+    async def start_charging(self) -> dict:
+        return await self._rrpc("RRPC/StartChg", {
+            "StartType": 4,
+            "GunNo": 1,
+        })
+
+    async def stop_charging(self) -> dict:
+        # OrderNo kann leer bleiben – funktioniert laut HAR
+        return await self._rrpc("RRPC/StopChg", {
+            "StopCode": 1,
+            "OrderNoServer": "",
+            "OrderNoAPP": "",
+            "OrderNoPoint": "",
+            "GunNo": 1,
+        })
